@@ -7,7 +7,9 @@ Ogni skill vive in una cartella con un `SKILL.md` che contiene il frontmatter
 (`name`, `description`) e le istruzioni operative.
 
 Apri `cloude-skill.code-workspace` (o aggiungi questa cartella a un workspace
-esistente) per vederla in Explorer come **cloude skill**.
+esistente) per vederla in Explorer come **cloude skill**. Le skill sono già
+collegate in `.claude/skills` e `.cursor/skills` di questa repo: aprirla basta
+per usarle qui. Per tutti gli altri progetti, una volta: `./install.sh`.
 
 ## Struttura
 
@@ -20,8 +22,10 @@ skills/                      # skill nostre
     assets/                  # opzionale: template, file di supporto
 third-party/                 # skill di terzi, con SOURCE.md di provenienza
 _template/SKILL.md           # punto di partenza per una skill nuova
-install.sh                   # symlink verso ~/.claude/skills e ~/.cursor/skills
+install.sh                   # symlink globali + .claude/skills e .cursor/skills in repo
 cloude-skill.code-workspace  # nome in sidebar: "cloude skill"
+.claude/skills               # skill visibili a Claude Code in questa repo
+.cursor/skills               # skill visibili a Cursor Agent in questa repo
 ```
 
 ## Sidebar
@@ -34,9 +38,14 @@ Per tenerla visibile mentre lavori su un altro progetto:
 
 ## Installazione
 
-Le skill vengono collegate in `~/.claude/skills` **e** `~/.cursor/skills` con dei
-symlink: sono così disponibili in Claude Code e in Cursor Agent su questa macchina.
-Modificare un file qui aggiorna il comportamento ovunque senza reinstallare niente.
+`./install.sh` collega le skill in quattro posti:
+
+- `~/.claude/skills` e `~/.cursor/skills` — tutte le sessioni di questa macchina
+- `.claude/skills` e `.cursor/skills` in questa repo — aprirla o aggiungerla
+  in sidebar basta per usarle senza install globale
+
+Modificare un file in `skills/` o `third-party/` aggiorna il comportamento ovunque
+senza reinstallare niente.
 
 ```bash
 ./install.sh                 # tutte le skill (skills/ + third-party/)

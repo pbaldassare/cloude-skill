@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Crea/aggiorna i symlink delle skill in ~/.claude/skills e ~/.cursor/skills,
-# rendendole disponibili in Claude Code e Cursor Agent su questa macchina.
+# Crea/aggiorna i symlink delle skill in:
+#   ~/.claude/skills          Claude Code, tutte le sessioni di questa macchina
+#   ~/.cursor/skills          Cursor Agent, tutte le sessioni di questa macchina
+#   .claude/skills            questa repo (aprire o aggiungere in workspace)
+#   .cursor/skills            questa repo (aprire o aggiungere in workspace)
 #
 #   ./install.sh              # installa tutte le skill (skills/ + third-party/)
 #   ./install.sh supabase-rls # installa solo le skill indicate
-#   ./install.sh --list       # mostra cosa è installato e da dove
+#   ./install.sh --list       # mostra cosa è installato e dove punta
 #   ./install.sh --prune      # rimuove i symlink orfani che puntano a questa repo
 
 set -euo pipefail
@@ -13,7 +16,11 @@ shopt -s nullglob
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 CURSOR_DIR="${CURSOR_SKILLS_DIR:-$HOME/.cursor/skills}"
-TARGET_DIRS=("$CLAUDE_DIR" "$CURSOR_DIR")
+REPO_CLAUDE="$REPO_DIR/.claude/skills"
+REPO_CURSOR="$REPO_DIR/.cursor/skills"
+HOME_DIRS=("$CLAUDE_DIR" "$CURSOR_DIR")
+REPO_DIRS=("$REPO_CLAUDE" "$REPO_CURSOR")
+TARGET_DIRS=("${HOME_DIRS[@]}" "${REPO_DIRS[@]}")
 SOURCE_DIRS=("$REPO_DIR/skills" "$REPO_DIR/third-party")
 
 find_skill() {
@@ -37,14 +44,29 @@ all_skills() {
   done
 }
 
+# Path relativo da .claude/skills o .cursor/skills verso la cartella della skill.
+repo_link_src() {
+  local src="$1"
+  case "$src" in
+    "$REPO_DIR/skills/"*) printf '../../skills/%s\n' "$(basename "$src")" ;;
+    "$REPO_DIR/third-party/"*) printf '../../third-party/%s\n' "$(basename "$src")" ;;
+    *) printf '%s\n' "$src" ;;
+  esac
+}
+
 link_skill_into() {
-  local name="$1" src="$2" target_dir="$3" dest
+  local name="$1" src="$2" target_dir="$3" dest link_src
   dest="$target_dir/$name"
+  if [[ "$target_dir" == "$REPO_DIR/"* ]]; then
+    link_src="$(repo_link_src "$src")"
+  else
+    link_src="$src"
+  fi
 
   if [[ -L "$dest" ]]; then
     local current
     current="$(readlink "$dest")"
-    if [[ "$current" == "$src" ]]; then
+    if [[ "$current" == "$link_src" ]]; then
       echo "  = $name (già collegata)"
       return 0
     fi
@@ -55,8 +77,8 @@ link_skill_into() {
     return 1
   fi
 
-  ln -s "$src" "$dest"
-  echo "  + $name → $src"
+  ln -s "$link_src" "$dest"
+  echo "  + $name → $link_src"
 }
 
 link_skill() {
@@ -103,7 +125,11 @@ prune_dir() {
   for path in "$target_dir"/*; do
     if [[ -L "$path" ]]; then
       target="$(readlink "$path")"
-      if [[ "$target" == "$REPO_DIR"* && ! -e "$target" ]]; then
+      local resolved="$target"
+      if [[ "$target" != /* ]]; then
+        resolved="$(cd "$(dirname "$path")" && pwd)/$target"
+      fi
+      if [[ "$resolved" == "$REPO_DIR"* && ! -e "$path" ]]; then
         rm "$path"
         echo "  - $(basename "$path")"
         removed=1
@@ -117,15 +143,17 @@ prune_dir() {
 
 case "${1:-}" in
   --list)
-    list_dir "$CLAUDE_DIR"
-    echo
-    list_dir "$CURSOR_DIR"
+    for dir in "${TARGET_DIRS[@]}"; do
+      list_dir "$dir"
+      echo
+    done
     exit 0
     ;;
   --prune)
-    prune_dir "$CLAUDE_DIR"
-    echo
-    prune_dir "$CURSOR_DIR"
+    for dir in "${TARGET_DIRS[@]}"; do
+      prune_dir "$dir"
+      echo
+    done
     exit 0
     ;;
 esac
