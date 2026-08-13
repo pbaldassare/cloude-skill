@@ -90,3 +90,4 @@ riferimento e modifiche locali. Dettagli in `third-party/README.md`.
 |---|---|---|
 | [`supabase-rls`](skills/supabase-rls/SKILL.md) | Progettazione, scrittura, debug e verifica delle policy RLS su Supabase/Postgres: multi-tenant, security definer, performance, trappole ricorrenti | nostra |
 | [`impeccable`](third-party/impeccable/SKILL.md) | Design frontend per agent: init/document, shape, critique, audit, polish, animate, layout, typeset e altri comandi; evita l'estetica AI generica | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) |
+| [`crawl4ai`](third-party/crawl4ai/SKILL.md) | Crawl e estrazione dati da pagine web (anche JS): markdown LLM-ready, schema CSS/JSON, batch crawl, pipeline; SDK + script pronti | [unclecode/crawl4ai](https://github.com/unclecode/crawl4ai) |
