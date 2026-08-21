@@ -1,0 +1,33 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  contract:
+    name: Contratto delle skill
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verifica il contratto (SKILL-CONTRACT.md)
+        run: ./validate.sh
+
+      - name: Verifica che install.sh e bootstrap.sh siano eseguibili e validi
+        run: |
+          bash -n install.sh
+          bash -n bootstrap.sh
+          bash -n validate.sh
+          test -x install.sh || { echo "install.sh non eseguibile"; exit 1; }
+          test -x bootstrap.sh || { echo "bootstrap.sh non eseguibile"; exit 1; }
+
+      - name: Prova d'installazione in una destinazione temporanea
+        run: |
+          CLAUDE_SKILLS_DIR="$RUNNER_TEMP/claude" \
+          CURSOR_SKILLS_DIR="$RUNNER_TEMP/cursor" \
+            ./install.sh
+          CLAUDE_SKILLS_DIR="$RUNNER_TEMP/claude" \
+          CURSOR_SKILLS_DIR="$RUNNER_TEMP/cursor" \
+            ./install.sh --list

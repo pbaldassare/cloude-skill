@@ -1,15 +1,11 @@
 # cloude-skill
 
 Collezione centralizzata di skill riutilizzabili in **Claude Code** e **Cursor**,
-su tutti i progetti.
+su tutti i progetti. Vive su GitHub: qualsiasi macchina o sessione, anche remota,
+può tirarle giù da sola.
 
-Ogni skill vive in una cartella con un `SKILL.md` che contiene il frontmatter
-(`name`, `description`) e le istruzioni operative.
-
-Apri `cloude-skill.code-workspace` (o aggiungi questa cartella a un workspace
-esistente) per vederla in Explorer come **cloude skill**. Le skill sono già
-collegate in `.claude/skills` e `.cursor/skills` di questa repo: aprirla basta
-per usarle qui. Per tutti gli altri progetti, una volta: `./install.sh`.
+Ogni skill è una cartella con un `SKILL.md` (frontmatter + istruzioni) che rispetta il
+[contratto](SKILL-CONTRACT.md), verificato da `./validate.sh` e dalla CI a ogni push.
 
 ## Struttura
 
@@ -22,30 +18,62 @@ skills/                      # skill nostre
     assets/                  # opzionale: template, file di supporto
 third-party/                 # skill di terzi, con SOURCE.md di provenienza
 _template/SKILL.md           # punto di partenza per una skill nuova
-install.sh                   # symlink globali + .claude/skills e .cursor/skills in repo
-cloude-skill.code-workspace  # nome in sidebar: "cloude skill"
-.claude/skills               # skill visibili a Claude Code in questa repo
-.cursor/skills               # skill visibili a Cursor Agent in questa repo
+
+bootstrap.sh                 # da GitHub a macchina pronta, in un comando
+install.sh                   # symlink delle skill nelle destinazioni note
+setup-project.sh             # configura un progetto perché se le tiri giù da solo
+validate.sh                  # verifica il contratto delle skill
+hooks/session-start.sh       # hook da copiare nei progetti
 ```
 
-## Sidebar
+## Accesso alle skill: i tre scenari
 
-Per tenerla visibile mentre lavori su un altro progetto:
+### 1. La tua macchina (Claude Code CLI, desktop, Cursor)
 
-1. Clona questa repo in un posto fisso (es. `~/code/cloude-skill`).
-2. In Cursor: **File → Add Folder to Workspace…** e scegli il clone.
-3. Oppure apri `cloude-skill.code-workspace`: in Explorer la cartella si chiama **cloude skill**.
+Un comando, anche senza aver clonato niente:
 
-## Installazione
+```bash
+curl -fsSL https://raw.githubusercontent.com/pbaldassare/cloude-skill/HEAD/bootstrap.sh | bash
+```
 
-`./install.sh` collega le skill in quattro posti:
+Clona la repo in `~/.local/share/cloude-skill` e collega ogni skill in
+`~/.claude/skills` e `~/.cursor/skills`. Da quel momento sono attive in **tutte** le
+sessioni della macchina. Per aggiornarle: `~/.local/share/cloude-skill/bootstrap.sh`.
 
-- `~/.claude/skills` e `~/.cursor/skills` — tutte le sessioni di questa macchina
-- `.claude/skills` e `.cursor/skills` in questa repo — aprirla o aggiungerla
-  in sidebar basta per usarle senza install globale
+Se hai già il clone, `./bootstrap.sh` usa quello invece di farne un secondo.
 
-Modificare un file in `skills/` o `third-party/` aggiorna il comportamento ovunque
-senza reinstallare niente.
+### 2. Sessioni remote (Claude Code sul web, container CI)
+
+Lì `~/.claude/skills` non esiste: il container clona solo il repo del progetto. La
+soluzione è un SessionStart hook nel progetto, che all'avvio tira giù le skill da
+GitHub e le collega:
+
+```bash
+./setup-project.sh ~/code/mio-progetto
+```
+
+Copia `hooks/session-start.sh` in `<progetto>/.claude/hooks/cloude-skill.sh`, lo
+registra in `.claude/settings.json` e ignora `.claude/skills/` nel git del progetto.
+Committa quei due file nel progetto: da lì in poi ogni sessione, locale o remota, ha le
+skill senza fare niente.
+
+L'hook è deliberatamente conservativo: rifetcha al massimo ogni 6 ore, e se GitHub non
+risponde usa la cache ed esce 0 — **non blocca mai** l'avvio della sessione.
+
+### 3. Progetto autonomo (collaboratori, CI senza rete verso GitHub)
+
+```bash
+./setup-project.sh ~/code/mio-progetto --copy
+```
+
+Copia le skill dentro il progetto invece di collegarle. Contropartita: non si aggiornano
+più quando modifichi questa repo. Da usare solo quando il progetto deve funzionare senza
+dipendere da qui.
+
+## install.sh
+
+`bootstrap.sh` e l'hook lo chiamano da soli; serve direttamente solo per collegare
+qualcosa a mano.
 
 ```bash
 ./install.sh                 # tutte le skill (skills/ + third-party/)
@@ -54,35 +82,49 @@ senza reinstallare niente.
 ./install.sh --prune         # rimuove i symlink orfani di questa repo
 ```
 
-Lo script non sovrascrive mai una cartella reale già presente nella destinazione:
-in quel caso segnala il conflitto e passa oltre. Destinazioni modificabili con
-`CLAUDE_SKILLS_DIR` e `CURSOR_SKILLS_DIR`.
+Collega in `~/.claude/skills`, `~/.cursor/skills` e nelle cartelle `.claude/skills` /
+`.cursor/skills` di questa repo. Non sovrascrive mai una cartella reale già presente:
+segnala il conflitto e passa oltre. Destinazioni modificabili con `CLAUDE_SKILLS_DIR` e
+`CURSOR_SKILLS_DIR`.
 
-Conseguenza da tenere presente: il progetto che usa la skill **non** la contiene. Su
-un'altra macchina, o per un collaboratore, va rifatto il clone di questa repo +
-`./install.sh`. Se una skill deve viaggiare insieme al progetto, copiarla dentro
-`.claude/skills/` o `.cursor/skills/` del progetto invece di collegarla.
+Essendo symlink, modificare un file in `skills/` o `third-party/` aggiorna il
+comportamento ovunque senza reinstallare niente.
 
-## Aggiungere una skill nuova
+## Aggiungere una skill
 
 ```bash
 cp -r _template skills/<nome-skill>
+$EDITOR skills/<nome-skill>/SKILL.md
+./validate.sh <nome-skill>
+./install.sh <nome-skill>
 ```
 
-Poi si compila `SKILL.md` e si aggiorna l'indice qui sotto.
+Poi una riga nell'indice qui sotto e commit. Le regole che ogni skill deve rispettare —
+e soprattutto **come si scrive una description che faccia attivare la skill** — stanno
+in [SKILL-CONTRACT.md](SKILL-CONTRACT.md).
 
-- `name`: minuscolo, kebab-case, uguale al nome della cartella.
-- `description`: è il **solo** testo che Claude/Cursor legge per decidere se attivare la skill.
-  Deve dire *cosa fa* e *quando usarla*, con i termini che l'utente userebbe davvero —
-  inclusi i messaggi d'errore tipici, che sono l'innesco più affidabile.
-- Corpo sotto le ~500 righe: quello che serve raramente va in `references/` e viene
-  letto solo al bisogno.
-- Istruzioni imperative e concrete, non descrizioni generiche.
+Per una skill di terzi: va in `third-party/<nome>/` con un `SOURCE.md` che dichiara
+origine, licenza, commit e modifiche locali. Dettagli in
+[third-party/README.md](third-party/README.md).
 
-## Aggiungere una skill di terzi
+## validate.sh
 
-Va in `third-party/<nome>/` con un `SOURCE.md` che dichiara origine, licenza, commit di
-riferimento e modifiche locali. Dettagli in `third-party/README.md`.
+```bash
+./validate.sh                # tutte
+./validate.sh supabase-rls   # una sola
+```
+
+Controlla frontmatter, coerenza `name` ↔ cartella, description utilizzabile come
+innesco, link interni, dimensione, `SOURCE.md` e licenza per le skill di terzi,
+collisioni di nome, chiavi committate per sbaglio. Gira in CI su ogni push: una skill
+che non rispetta il contratto fa fallire il check.
+
+## Sidebar in Cursor
+
+Per tenerla visibile mentre lavori su un altro progetto: apri
+`cloude-skill.code-workspace`, oppure **File → Add Folder to Workspace…** sul clone.
+Le skill sono già collegate in `.claude/skills` e `.cursor/skills` di questa repo,
+quindi aprirla basta per usarle qui.
 
 ## Indice skill
 
